@@ -3,6 +3,12 @@ use std::{
     time::Duration,
 };
 
+use colored::Colorize;
+use crossterm::{
+    cursor,
+    terminal::{self, ClearType},
+    ExecutableCommand,
+};
 use solana_client::{
     client_error::{ClientError, ClientErrorKind, Result as ClientResult},
     nonblocking::rpc_client::RpcClient,
@@ -97,11 +103,11 @@ impl Miner {
         let mut sigs = vec![];
         let mut attempts = 0;
         loop {
-            println!("Attempt: {:?}", attempts);
+            // println!("Attempt: {:?}", attempts);
             match client.send_transaction_with_config(&tx, send_cfg).await {
                 Ok(sig) => {
                     sigs.push(sig);
-                    println!("{:?}", sig);
+                    // println!("{:?}", sig);
 
                     // Confirm tx
                     if skip_confirm {
@@ -111,7 +117,7 @@ impl Miner {
                         std::thread::sleep(Duration::from_millis(2000));
                         match client.get_signature_statuses(&sigs).await {
                             Ok(signature_statuses) => {
-                                println!("Confirms: {:?}", signature_statuses.value);
+                                // println!("Confirms: {:?}", signature_statuses.value);
                                 for signature_status in signature_statuses.value {
                                     if let Some(signature_status) = signature_status.as_ref() {
                                         if signature_status.confirmation_status.is_some() {
@@ -123,7 +129,17 @@ impl Miner {
                                                 TransactionConfirmationStatus::Processed => {}
                                                 TransactionConfirmationStatus::Confirmed
                                                 | TransactionConfirmationStatus::Finalized => {
-                                                    println!("Transaction landed!");
+                                                    stdout.execute(cursor::MoveTo(0, 9)).unwrap();
+                                                    stdout
+                                                        .execute(terminal::Clear(
+                                                            ClearType::CurrentLine,
+                                                        ))
+                                                        .unwrap();
+                                                    print!(
+                                                        "{}",
+                                                        format!("Transaction {} landed!", attempts)
+                                                            .green()
+                                                    );
                                                     return Ok(sig);
                                                 }
                                             }
@@ -140,7 +156,14 @@ impl Miner {
                             }
                         }
                     }
-                    println!("Transaction did not land");
+                    stdout.execute(cursor::MoveTo(0, 9)).unwrap();
+                    stdout
+                        .execute(terminal::Clear(ClearType::CurrentLine))
+                        .unwrap();
+                    print!(
+                        "{} ",
+                        format!("Transaction {} did not land", attempts).red()
+                    );
                 }
 
                 // Handle submit errors

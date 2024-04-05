@@ -18,6 +18,12 @@ use crate::{
     utils::{get_clock_account, get_proof, get_treasury},
     Miner,
 };
+use crossterm::{
+    cursor::{self, Hide},
+    execute,
+    terminal::{self, ClearType},
+    ExecutableCommand,
+};
 
 // Odds of being selected to submit a reset tx
 const RESET_ODDS: u64 = 20;
@@ -28,6 +34,7 @@ impl Miner {
         let signer = self.signer();
         self.register().await;
         let mut stdout = stdout();
+        execute!(stdout, Hide).unwrap();
         let mut rng = rand::thread_rng();
 
         // Start mining loop
@@ -41,18 +48,25 @@ impl Miner {
             let reward_rate =
                 (treasury.reward_rate as f64) / (10f64.powf(ore::TOKEN_DECIMALS as f64));
             stdout.write_all(b"\x1b[2J\x1b[3J\x1b[H").ok();
+            execute!(stdout, terminal::Clear(ClearType::All)).unwrap();
+            stdout.execute(cursor::MoveTo(0, 0)).unwrap();
             println!("Balance: {} ORE", balance);
             println!("Claimable: {} ORE", rewards);
             println!("Reward rate: {} ORE", reward_rate);
 
             // Escape sequence that clears the screen and the scrollback buffer
-            println!("\nMining for a valid hash...");
+            stdout.execute(cursor::MoveTo(0, 4)).unwrap();
+            // stdout
+            //     .execute(terminal::Clear(ClearType::CurrentLine))
+            //     .unwrap();
+            println!("Mining for a valid hash...");
             let (next_hash, nonce) =
                 self.find_next_hash_par(proof.hash.into(), treasury.difficulty.into(), threads);
 
             // Submit mine tx.
             // Use busses randomly so on each epoch, transactions don't pile on the same busses
-            println!("\n\nSubmitting hash for validation...");
+            stdout.execute(cursor::MoveTo(0, 7)).unwrap();
+            print!("Submitting hash for validation...");
             loop {
                 // Reset epoch, if needed
                 let treasury = get_treasury(self.cluster.clone()).await;
@@ -61,7 +75,7 @@ impl Miner {
                 if clock.unix_timestamp.ge(&threshold) {
                     // There are a lot of miners right now, so randomly select into submitting tx
                     if rng.gen_range(0..RESET_ODDS).eq(&0) {
-                        println!("Sending epoch reset transaction...");
+                        print!("Sending epoch reset transaction...");
                         let cu_limit_ix =
                             ComputeBudgetInstruction::set_compute_unit_limit(CU_LIMIT_RESET);
                         let cu_price_ix =
@@ -76,7 +90,15 @@ impl Miner {
                 // Submit request.
                 let bus = self.find_bus_id(treasury.reward_rate).await;
                 let bus_rewards = (bus.rewards as f64) / (10f64.powf(ore::TOKEN_DECIMALS as f64));
-                println!("Sending on bus {} ({} ORE)", bus.id, bus_rewards);
+                stdout.execute(cursor::MoveTo(0, 8)).unwrap();
+                stdout
+                    .execute(terminal::Clear(ClearType::CurrentLine))
+                    .unwrap();
+                print!("Sending on bus {} ({} ORE)", bus.id, bus_rewards);
+                stdout.execute(cursor::MoveTo(0, 9)).unwrap();
+                stdout
+                    .execute(terminal::Clear(ClearType::CurrentLine))
+                    .unwrap();
                 let cu_limit_ix = ComputeBudgetInstruction::set_compute_unit_limit(CU_LIMIT_MINE);
                 let cu_price_ix =
                     ComputeBudgetInstruction::set_compute_unit_price(self.priority_fee);
