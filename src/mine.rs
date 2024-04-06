@@ -34,7 +34,7 @@ impl Miner {
         let signer = self.signer();
         self.register().await;
         let mut stdout = stdout();
-        execute!(stdout, Hide).unwrap();
+        // execute!(stdout, Hide).unwrap();
         let mut rng = rand::thread_rng();
 
         // Start mining loop
@@ -56,9 +56,9 @@ impl Miner {
 
             // Escape sequence that clears the screen and the scrollback buffer
             stdout.execute(cursor::MoveTo(0, 4)).unwrap();
-            // stdout
-            //     .execute(terminal::Clear(ClearType::CurrentLine))
-            //     .unwrap();
+            stdout
+                .execute(terminal::Clear(ClearType::CurrentLine))
+                .unwrap();
             println!("Mining for a valid hash...");
             let (next_hash, nonce) =
                 self.find_next_hash_par(proof.hash.into(), treasury.difficulty.into(), threads);
@@ -66,6 +66,9 @@ impl Miner {
             // Submit mine tx.
             // Use busses randomly so on each epoch, transactions don't pile on the same busses
             stdout.execute(cursor::MoveTo(0, 7)).unwrap();
+            stdout
+                .execute(terminal::Clear(ClearType::CurrentLine))
+                .unwrap();
             print!("Submitting hash for validation...");
             loop {
                 // Reset epoch, if needed
@@ -75,6 +78,10 @@ impl Miner {
                 if clock.unix_timestamp.ge(&threshold) {
                     // There are a lot of miners right now, so randomly select into submitting tx
                     if rng.gen_range(0..RESET_ODDS).eq(&0) {
+                        stdout.execute(cursor::MoveTo(0, 7)).unwrap();
+                        stdout
+                            .execute(terminal::Clear(ClearType::CurrentLine))
+                            .unwrap();
                         print!("Sending epoch reset transaction...");
                         let cu_limit_ix =
                             ComputeBudgetInstruction::set_compute_unit_limit(CU_LIMIT_RESET);
